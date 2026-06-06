@@ -275,5 +275,105 @@ def main():
         print(f"Unknown function: {func}")
 
 
+# reserve slot
+def reserveSlot(eid, snum, uid):
+    """
+    Reserve a specific slot for a participant.
+    The slot must currently be unreserved.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # check slot exists and is currently unreserved
+        cursor.execute(
+            "SELECT is_reserved FROM Slot WHERE eid = %s AND snum = %s",
+            (eid, snum)
+        )
+        result = cursor.fetchone()
+
+        # if slot doesn't exist or is already taken, it's a fail
+        if result is None or result[0] == 1:
+            cursor.close()
+            conn.close()
+            print("Fail")
+            return
+
+        # update the slot with the participant's uid and flip the reservation flag
+        cursor.execute(
+            "UPDATE Slot SET is_reserved = TRUE, uid = %s WHERE eid = %s AND snum = %s",
+            (uid, eid, snum)
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Success")
+    except Exception:
+        print("Fail")
+
+
+# cancel reservation
+def cancelReservation(eid, snum, uid):
+    """
+    Cancel a participant's reservation for a specific event slot.
+    Only cancel if the slot is currently reserved by the given participant.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # ensure the slot is actually reserved by the user
+        cursor.execute(
+            "SELECT COUNT(*) FROM Slot WHERE eid = %s AND snum = %s AND uid = %s AND is_reserved = TRUE",
+            (eid, snum, uid)
+        )
+
+        if cursor.fetchone()[0] == 0:
+            cursor.close()
+            conn.close()
+            print("Fail")
+            return
+
+        # unreserve slot and strip the user ID
+        cursor.execute(
+            "UPDATE Slot SET is_reserved = FALSE, uid = NULL WHERE eid = %s AND snum = %s",
+            (eid, snum)
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Success")
+    except Exception:
+        print("Fail")
+
+
+# update event
+def updateEvent(eid, title, datetime_str):
+    """
+    Update the title and the datetime of an event.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # update event matching the given eid
+        cursor.execute(
+            "UPDATE Event SET title = %s, datetime = %s WHERE eid = %s",
+            (title, datetime_str, eid)
+        )
+
+        # no rows affected means the eid didn't exist
+        if cursor.rowcount == 0:
+            raise Exception("Event not found")
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Success")
+    except Exception:
+        print("Fail")
+
 if __name__ == '__main__':
     main()
