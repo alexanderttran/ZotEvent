@@ -422,7 +422,7 @@ def popularEventTypes(N):
             JOIN Slot s ON e.eid = s.eid
             WHERE s.is_reserved = TRUE
             GROUP BY e.type
-            HAVING COUNT(*) >= &s
+            HAVING COUNT(*) >= %s
             ORDER BY reservedCount DESC, e.type ASC
         """, (N,))
 
