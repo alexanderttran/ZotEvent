@@ -251,30 +251,6 @@ def addVenue(eid, vid, is_primary):
         print("Fail")
 
 
-# --- Dispatcher ---
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 project.py <function> [args...]")
-        return
-
-    func = sys.argv[1]
-    args = sys.argv[2:]
-
-    if func == 'import':
-        import_data(args[0])
-
-    elif func == 'insertAdmin':
-        # uid email username joined firstname lastname
-        insertAdmin(args[0], args[1], args[2], args[3], args[4], args[5])
-
-    elif func == 'addVenue':
-        # eid vid is_primary
-        addVenue(args[0], args[1], args[2])
-
-    else:
-        print(f"Unknown function: {func}")
-
-
 # reserve slot
 def reserveSlot(eid, snum, uid):
     """
@@ -374,6 +350,132 @@ def updateEvent(eid, title, datetime_str):
         print("Success")
     except Exception:
         print("Fail")
+
+def deleteOrganizer(uid):
+    """
+    Delete an organizer from the database.
+    ON DELETE CASCADE deletes the events, slots, and hosting records.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM Organizer WHERE uid = %s", (uid,))
+
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            print("Fail")
+            return
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Success")
+    except Exception:
+        print("Fail")
+
+def availableEvents(date):
+    """
+    List all future events that still have at least one
+    unreserved slot. Sort by datetime ascending, then eid asc.
+    """
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT e.eid, e.title, e.type, e.datetime,
+                       COUNT(*) AS availableSlots
+            FROM Event e
+            JOIN Slot s ON e.eid = s.eid
+            WHERE e.datetime > %s 
+                       AND s.is_reserved = FALSE
+            GROUP BY e.eid, e.title, e.type, e.datetime
+            ORDER BY e.datetime ASC, e.eid ASC
+        """, (date,))
+
+        for row in cursor.fetchall():
+            print(','.join(str(x) for x in row))
+
+        cursor.close()
+        conn.close()
+    
+    except Exception:
+        print("Fail")
+
+def popularEventTypes(N):
+    """
+    For each event type, compute total reserved slots across all events.
+    Return only types with at least N reserved slots. Sort by
+    reservedCount descending, then type ascending.
+    """
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT e.type, COUNT(*) AS reservedCount
+            FROM Event e
+            JOIN Slot s ON e.eid = s.eid
+            WHERE s.is_reserved = TRUE
+            GROUP BY e.type
+            HAVING COUNT(*) >= &s
+            ORDER BY reservedCount DESC, e.type ASC
+        """, (N,))
+
+        for row in cursor.fetchall():
+            print(','.join(str(x) for x in row))
+
+        cursor.close()
+        conn.close()
+    
+    except Exception:
+        print("Fail")
+
+# --- Dispatcher ---
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 project.py <function> [args...]")
+        return
+
+    func = sys.argv[1]
+    args = sys.argv[2:]
+
+    if func == 'import':
+        import_data(args[0])
+
+    elif func == 'insertAdmin':
+        # uid email username joined firstname lastname
+        insertAdmin(args[0], args[1], args[2], args[3], args[4], args[5])
+
+    elif func == 'addVenue':
+        # eid vid is_primary
+        addVenue(args[0], args[1], args[2])
+
+    elif func == 'reserveSlot':
+        reserveSlot(args[0], args[1], args[2])
+
+    elif func == 'cancelReservation':
+        cancelReservation(args[0], args[1], args[2])
+
+    elif func == 'updateEvent':
+        updateEvent(args[0], args[1], args[2])
+
+    elif func == 'deleteOrganizer':
+        deleteOrganizer(args[0])
+    
+    elif func == 'availableEvents':
+        availableEvents(args[0])
+
+    elif func == 'popularEventTypes':
+        popularEventTypes(args[0])
+
+    else:
+        print(f"Unknown function: {func}")
+
 
 if __name__ == '__main__':
     main()
