@@ -435,6 +435,88 @@ def popularEventTypes(N):
     except Exception:
         print("Fail")
 
+# 10. Participant schedule
+def participantSchedule(uid):
+    """
+    Given a participant ID, list all events for which the
+    participant has reserved a slot.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT e.eid, e.title, e.type, e.datetime, s.snum,
+                v.vid, v.street, v.city, v.state, v.zip
+            FROM Slot s
+            JOIN Event e ON s.eid = e.eid
+            LEFT JOIN Hosting h ON e.eid = h.eid AND h.is_primary = TRUE
+            LEFT JOIN Venue v ON h.vid = v.vid
+            WHERE s.uid = %s AND s.is_reserved = TRUE
+            ORDER BY e.datetime ASC
+        """, (uid,))
+
+        for row in cursor.fetchall():
+            print(','.join(str(x) for x in row))
+
+        cursor.close()
+        conn.close()
+    except Exception:
+        print("Fail")
+
+# 11. Organizer event count
+def organizerStats(N):
+    """
+    List organizers who have created at least N events.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT u.uid, u.username, o.department, COUNT(e.eid) AS eventCount
+            FROM User u
+            JOIN Organizer o ON u.uid = o.uid
+            JOIN Event e ON o.uid = e.creator_uid
+            GROUP BY u.uid, u.username, o.department
+            HAVING COUNT(e.eid) >= %s
+            ORDER BY eventCount DESC, u.uid ASC
+        """, (int(N),))
+
+        for row in cursor.fetchall():
+            print(','.join(str(x) for x in row))
+
+        cursor.close()
+        conn.close()
+
+    except Exception:
+        print("Fail")
+
+# 12. Venue event list
+def venueEvents(vid):
+    """
+    Given a venue ID, list all events hosted at that venue.
+    """
+    try: 
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT e.eid, e.title, e.type, e.datetime, h.is_primary
+            FROM Event e
+            JOIN Hosting h ON e.eid = h.eid
+            WHERE h.vid = %s
+            ORDER BY e.datetime ASC, e.eid ASC
+        """, (vid,))
+
+        for row in cursor.fetchall():
+            print(','.join(str(x) for x in row))
+
+        cursor.close()
+        conn.close()
+    except Exception:
+        print("Fail")
+
 # --- Dispatcher ---
 def main():
     if len(sys.argv) < 2:
@@ -473,6 +555,15 @@ def main():
     elif func == 'popularEventTypes':
         popularEventTypes(args[0])
 
+    elif func == 'participantSchedule':
+        participantSchedule(args[0])
+
+    elif func == 'organizerStats':
+        organizerStats(args[0])
+
+    elif func == 'venueEvents':
+        venueEvents(args[0])
+        
     else:
         print(f"Unknown function: {func}")
 
